@@ -33,12 +33,12 @@ void setup() {
   pinMode(In2, OUTPUT);
 }
 
-void drawMessage(const char* line1, const char* line2) {
+void drawMessage(const char* line1, const char* line2, int cursorX) {
   u8g2.setFont(u8g2_font_unifont_t_korean1);
   u8g2.setFontDirection(0);
   u8g2.setCursor(20, 20);
   u8g2.print(line1);
-  u8g2.setCursor(40, 40);
+  u8g2.setCursor(cursorX, 40);
   u8g2.print(line2);
 }
 
@@ -109,9 +109,9 @@ void loop() {
   u8g2.firstPage();
   do {
     if (analogRead(A4) < 700) {
-      drawMessage("비가 내리니", "안전 운행하세요");
+      drawMessage("비가 내리니", "안전 운행하세요", 5);
     } else {
-      drawMessage("즐거운 하루", "되세요!");
+      drawMessage("즐거운 하루", "되세요!", 40);
     }
   } while (u8g2.nextPage());
 }

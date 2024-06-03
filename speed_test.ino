@@ -5,8 +5,6 @@
 #include <SPI.h>
 #endif
 
-int v1;           // 첫 번째 센서의 순간 속도
-int v2;           // 두 번째 센서의 순간 속도
 int Sigpin1 = 8; // 첫 번째 센서의 신호 입력 핀
 int Sigpin2 = 12; // 두 번째 센서의 신호 입력 핀
 int speed = 9;
@@ -59,6 +57,8 @@ void speedCheck()
   unsigned long T1, T2;   // 주기
   double f1, f2;          // 주파수
   char s[20];             // Serial 출력 Length
+  int v1;           // 첫 번째 센서의 순간 속도
+  int v2;           // 두 번째 센서의 순간 속도
 
   // 첫 번째 센서 측정
   while (digitalRead(Sigpin1));

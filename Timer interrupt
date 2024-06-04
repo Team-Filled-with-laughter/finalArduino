@@ -1,0 +1,17 @@
+#include <MsTimer2.h>
+
+void playLcd() {
+u8g2.firstPage();
+  do {
+    if (analogRead(A4) < 700) {
+      drawMessage("비가 내리니", "안전 운행하세요", 5);
+    } else {
+      drawMessage("즐거운 하루", "되세요!", 40);
+    }
+  } while (u8g2.nextPage());
+}
+
+void setup() {
+MsTimer2::set(500,playLcd);
+MsTimer2::start();
+}

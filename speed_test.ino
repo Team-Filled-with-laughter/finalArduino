@@ -1,154 +1,162 @@
 #include <Arduino.h>
 #include <U8g2lib.h>
 #include <Wire.h>
+#include <MsTimer2.h>
 #ifdef U8X8_HAVE_HW_SPI
 #include <SPI.h>
 #endif
 
-int Sigpin1 = 8; // 첫 번째 센서의 신호 입력 핀
-int Sigpin2 = 12; // 두 번째 센서의 신호 입력 핀
-int speed = 9;
-int In1 = 5;
-int In2 = 6;
+// 아두이노에서 인터럽트핀을 사용하려면 2,3번핀만 사용가능 (핀 번호 교체이유)
+const int Sigpin1 = 2; // 원래 8번핀 
+const int Sigpin2 = 3; // 원래 12번핀
+const int speed = 9;
+const int In1 = 5;
+const int In2 = 6;
+const int overSpeed = 5;
+const int Address = 0x50;
+
+volatile unsigned long pulseStart1 = 0;
+volatile unsigned long pulseEnd1 = 0;
+volatile unsigned long pulseDuration1 = 0;
+
+volatile unsigned long pulseStart2 = 0;
+volatile unsigned long pulseEnd2 = 0;
+volatile unsigned long pulseDuration2 = 0;
+
 bool isOverspeed = false;
 bool isEmergency = false;
 
-U8G2_ST7920_128X64_1_SW_SPI u8g2(U8G2_R0, /* clock=*/ 13, /* data=*/ 11, /* CS=*/ 10, /* reset=*/ 8);
-const int Address = 0x50;
-
-int overSpeed = 5;
-unsigned long previousMillis = 0;
-const long speedInterval = 100;            // 0.1s마다 측정
 unsigned long overSpeedStartTime = 0;
+
+int v1 = 0;
+int v2 = 0;
+
+U8G2_ST7920_128X64_1_SW_SPI u8g2(U8G2_R0, /* clock=*/ 13, /* data=*/ 11, /* CS=*/ 10, /* reset=*/ 8);
 
 void setup() {
   u8g2.begin();
-  u8g2.enableUTF8Print();		// enable UTF8 support for the Arduino print() function
+  u8g2.enableUTF8Print();
   Serial.begin(9600);
   pinMode(Sigpin1, INPUT);
   pinMode(Sigpin2, INPUT);
   pinMode(speed, OUTPUT);
   pinMode(In1, OUTPUT);
   pinMode(In2, OUTPUT);
+  MsTimer2::set(500,playLcd);
+  MsTimer2::start();
+  attachInterrupt(digitalPinToInterrupt(Sigpin1), measurePulse1, CHANGE); // Sigpin1에 대한 인터럽트
+  attachInterrupt(digitalPinToInterrupt(Sigpin2), measurePulse2, CHANGE); // Sigpin2에 대한 인터럽트
+  actuatorUp();
 }
 
-void draw1(void)
-{
+void drawMessage(const char* line1, const char* line2, int cursorX) {
   u8g2.setFont(u8g2_font_unifont_t_korean1);
   u8g2.setFontDirection(0);
   u8g2.setCursor(20, 20);
-  u8g2.print("즐거운 하루");
-  u8g2.setCursor(40, 40);
-  u8g2.print("되세요!");
+  u8g2.print(line1);
+  u8g2.setCursor(cursorX, 40);
+  u8g2.print(line2);
 }
 
-void draw2(void)
-{
-  u8g2.setFont(u8g2_font_unifont_t_korean1);
-  u8g2.setFontDirection(0);
-  u8g2.setCursor(20, 20);
-  u8g2.print("비가 내리니");
-  u8g2.setCursor(5, 40);
-  u8g2.print("안전 운행하세요");
+void playLcd() {
+u8g2.firstPage();
+  do {
+    if (analogRead(A4) < 700) {
+      drawMessage("비가 내리니", "안전 운행하세요", 5);
+    } else {
+      drawMessage("즐거운 하루", "되세요!", 40);
+    }
+  } while (u8g2.nextPage());
 }
 
-void speedCheck()
-{
-  unsigned long T1, T2;   // 주기
-  double f1, f2;          // 주파수
-  char s[20];             // Serial 출력 Length
-  int v1;           // 첫 번째 센서의 순간 속도
-  int v2;           // 두 번째 센서의 순간 속도
+void measurePulse1() {
+  if (digitalRead(Sigpin1) == HIGH) { // while(digitalRead) 부분
+    pulseStart1 = micros();
+  } else {  // while(!digitalRead) 부분
+    pulseEnd1 = micros();
+    pulseDuration1 = pulseEnd1 - pulseStart1;
 
-  // 첫 번째 센서 측정
-  while (digitalRead(Sigpin1));
-  while (!digitalRead(Sigpin1));
-  T1 = pulseIn(Sigpin1, HIGH) + pulseIn(Sigpin1, LOW); // 주기 측정
-  f1 = 1 / (double)T1;                                // 주파수 측정
-  v1 = int((f1 * 1e6) / 44.0);                         // 속도 측정
-
-  sprintf(s, "v1 Speed: %3d km/h", v1);
-  Serial.println(s); // Serial 출력
-
-  // 두 번째 센서 측정
-  while (digitalRead(Sigpin2));
-  while (!digitalRead(Sigpin2));
-  T2 = pulseIn(Sigpin2, HIGH) + pulseIn(Sigpin2, LOW); // 주기 측정
-  f2 = 1 / (double)T2;                                // 주파수 측정
-  v2 = int((f2 * 1e6) / 44.0);                         // 속도 측정
-
-  sprintf(s, "v2 Speed: %3d km/h", v2);
-  Serial.println(s); // Serial 출력
-
-  if(v1 >= overSpeed || v2 >= overSpeed){
-    isOverspeed = true;
+    v1 = calculateSpeed(pulseDuration1);
+    Serial.print("v1 Speed: ");
+    Serial.print(v1);
+    Serial.println(" km/h");
   }
+}
+
+void measurePulse2() {
+  if (digitalRead(Sigpin2) == HIGH) { // while(digitalRead) 부분
+    pulseStart2 = micros();
+  } else {  // while(!digitalRead) 부분
+    pulseEnd2 = micros();
+    pulseDuration2 = pulseEnd2 - pulseStart2;
+
+    v2 = calculateSpeed(pulseDuration2);
+    Serial.print("v2 Speed: ");
+    Serial.print(v2);
+    Serial.println(" km/h");
+  }
+}
+
+int calculateSpeed(unsigned long duration) {
+  if (duration == 0){ // 주기가 0인경우 에러
+    Serial.print("Sensor error!");
+    return 0;
+  }
+  double frequency = 1.0 / duration;
+  int value = ((frequency * 1e6) / 44.0);
+  
+  if(value <= 120)  // 속도가 120 넘어가는 경우 에러(120km/s까지 측정가능)
+    return value;
   else{
-    isOverspeed = false;
+    Serial.print("Velocity Outlier!");
+    return 0;
   }
 }
 
-void actuatorDown(){
+void actuatorDown() {
   digitalWrite(In1, HIGH);
   digitalWrite(In2, LOW);
-  analogWrite(speed,255);
+  analogWrite(speed, 255);
 }
 
-void actuatorUp(){
+void actuatorUp() {
   digitalWrite(In1, LOW);
   digitalWrite(In2, HIGH);
-  analogWrite(speed,255);
+  analogWrite(speed, 255);
 }
 
-void detect(){
-  if(Serial.available() > 0){
+void detectEmergency() {
+  if (Serial.available() > 0) {
     char received = Serial.read();
     Serial.print("Received: ");
     Serial.println(received);
-
-    if(received == '0'){
-      isEmergency = false;
-    } else if(received == '1'){
-      isEmergency = true;
-    }
+    isEmergency = (received == '1') ? true : false; // 수정
   }
 }
 
 void loop() {
-  
   unsigned long currentMillis = millis();
-  if(currentMillis - previousMillis >= speedInterval){
-    previousMillis = currentMillis;
-    
-    speedCheck();
-    detect();
 
-    if(isOverspeed && !isEmergency){
+  isOverspeed = (v1 >= overSpeed || v2 >= overSpeed) ? true : false; // 수정
+
+  if (isOverspeed){ 
+    detectEmergency(); // 과속이 아니면 사실상 어떤 객체가 지나가도 작동안하므로 과속일때만 객체를 인식하는 기능
+
+    if (!isEmergency){
       overSpeedStartTime = currentMillis;
-      
-      Serial.print("Overspeed!!!");
-      Serial.println("");
+      Serial.println("Overspeed!!!");
       actuatorDown();
-
+      while (currentMillis <= overSpeedStartTime + 3000); // delay 3초 (아직 코드상 delay방법으로 채택)
+      actuatorUp();
+      overSpeedStartTime = 0; // 액추에이터가 올라오면 시간 초기화
     }
-
-    if(currentMillis - overSpeedStartTime >= 5000){
-        actuatorUp();
-    }
-
   }
-  
-  if(analogRead(A4)<700){
-    u8g2.firstPage();
-    do {
-      draw2();
-    } while ( u8g2.nextPage() );
-  }
-  else{
-    u8g2.firstPage();
-    do {
-      draw1();
-    } while ( u8g2.nextPage() );
-  }
-  
 }
+
+/*  if (isOverspeed && !isEmergency) {  
+    overSpeedStartTime = currentMillis;
+    Serial.println("Overspeed!!!");
+    actuatorDown();
+    while (currentMillis <= overSpeedStartTime + 3000);
+    actuatorUp();
+    overSpeedStartTime = 0;  */

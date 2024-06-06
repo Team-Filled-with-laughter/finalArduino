@@ -13,13 +13,10 @@ const int In1 = 5;
 const int In2 = 6;
 const int overSpeed = 5;
 const int Address = 0x50;
-const long speedInterval = 100; // 0.1s마다 측정
 
 bool isOverspeed = false;
 bool isEmergency = false;
 
-unsigned long previousMillis1 = 0;
-unsigned long previousMillis2 = 0;
 unsigned long overSpeedStartTime = 0;
 
 int v1 = 0;
@@ -123,16 +120,8 @@ void detectEmergency() {
 void loop() {
   unsigned long currentMillis = millis();
 
-  if (currentMillis - previousMillis1 >= speedInterval) {
-    previousMillis1 = currentMillis;
-    speedCheck1();
-  }
-
-  if (currentMillis - previousMillis2 >= speedInterval) {
-    previousMillis2 = currentMillis;
-    speedCheck2();
-  }
-
+  speedCheck1();
+  speedCheck2();
 
   isOverspeed = (v1 >= overSpeed || v2 >= overSpeed) ? true : false; // 수정
 

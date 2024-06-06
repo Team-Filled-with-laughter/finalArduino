@@ -1,6 +1,7 @@
 #include <Arduino.h>
 #include <U8g2lib.h>
 #include <Wire.h>
+#include <MsTimer2.h>
 #ifdef U8X8_HAVE_HW_SPI
 #include <SPI.h>
 #endif
@@ -35,6 +36,9 @@ void setup() {
   pinMode(speed, OUTPUT);
   pinMode(In1, OUTPUT);
   pinMode(In2, OUTPUT);
+  MsTimer2::set(500,playLcd);
+  MsTimer2::start();
+  actuatorUp();
 }
 
 void drawMessage(const char* line1, const char* line2, int cursorX) {
@@ -46,26 +50,53 @@ void drawMessage(const char* line1, const char* line2, int cursorX) {
   u8g2.print(line2);
 }
 
+void playLcd() {
+u8g2.firstPage();
+  do {
+    if (analogRead(A4) < 700) {
+      drawMessage("비가 내리니", "안전 운행하세요", 5);
+    } else {
+      drawMessage("즐거운 하루", "되세요!", 40);
+    }
+  } while (u8g2.nextPage());
+}
+
 int measureSpeed(int pin) {
-  while (digitalRead(pin));
-  while (!digitalRead(pin));
-  unsigned long T = pulseIn(pin, HIGH) + pulseIn(pin, LOW);
-  double frequency = 1.0 / T;
-  return int((frequency * 1e6) / 44.0);
+  unsigned long T = pulseIn(pin, HIGH, 100) + pulseIn(pin, LOW, 100); // 0.1s안에 HIGH값 안들어오면 0처리
+
+  if (T != 0)
+  {
+    double frequency = 1.0 / T;
+    int value = ((frequency * 1e6) / 44.0);
+
+    if (value <= 120) 
+    {
+      return value;
+    }
+    else // 속도 이상값 
+    {
+      Serial.print("Velocity Outlier!")
+      return 0;
+    }
+  }
+  else { // 측정이 안된경우 
+    Serial.print("No sensing!");
+    return 0;
+  }
 }
 
 void speedCheck1() {
   v1 = measureSpeed(Sigpin1);
-  char s[20];
-  sprintf(s, "v1 Speed: %3d km/h", v1);
-  Serial.println(s);
+  Serial.print("v1 Speed: ");
+  Serial.print(v1);
+  Serial.println(" km/h");
 }
 
 void speedCheck2() {
   v2 = measureSpeed(Sigpin2);
-  char s[20];
-  sprintf(s, "v2 Speed: %3d km/h", v2);
-  Serial.println(s);
+  Serial.print("v2 Speed: ");
+  Serial.print(v2);
+  Serial.println(" km/h");
 }
 
 void actuatorDown() {
@@ -85,8 +116,7 @@ void detectEmergency() {
     char received = Serial.read();
     Serial.print("Received: ");
     Serial.println(received);
-
-    isEmergency = (received == '1');
+    isEmergency = (received == '1') ? true : false; // 수정
   }
 }
 
@@ -103,26 +133,19 @@ void loop() {
     speedCheck2();
   }
 
-  isOverspeed = (v1 >= overSpeed || v2 >= overSpeed);
 
-  detectEmergency();
+  isOverspeed = (v1 >= overSpeed || v2 >= overSpeed) ? true : false; // 수정
 
-  if (isOverspeed && !isEmergency) {
-    overSpeedStartTime = currentMillis;
-    Serial.println("Overspeed!!!");
-    actuatorDown();
-  }
+  if (isOverspeed){ 
+    detectEmergency(); // 과속이 아니면 사실상 어떤 객체가 지나가도 작동안하므로 과속일때만 객체를 인식하는 기능
 
-  if (isOverspeed && currentMillis - overSpeedStartTime >= 5000) {
-    actuatorUp();
-  }
-
-  u8g2.firstPage();
-  do {
-    if (analogRead(A4) < 700) {
-      drawMessage("비가 내리니", "안전 운행하세요", 5);
-    } else {
-      drawMessage("즐거운 하루", "되세요!", 40);
+    if (!isEmergency){
+      overSpeedStartTime = currentMillis;
+      Serial.println("Overspeed!!!");
+      actuatorDown();
+      while (currentMillis <= overSpeedStartTime + 3000); // delay 3초 (아직 코드상 delay방법으로 채택)
+      actuatorUp();
+      overSpeedStartTime = 0; // 액추에이터가 올라오면 시간 초기화
     }
-  } while (u8g2.nextPage());
+  }
 }

@@ -72,7 +72,11 @@ u8g2.firstPage();
 void measurePulse1() {
   if (digitalRead(Sigpin1) == HIGH) { // while(digitalRead) 부분
     pulseStart1 = micros();
-  } else {  // while(!digitalRead) 부분
+  } 
+  else {  // while(!digitalRead) 부분
+    detachInterrupt(digitalPinToInterrupt(Sigpin1)); // 인터럽트 비활성화
+    delay(100);
+
     pulseEnd1 = micros();
     pulseDuration1 = pulseEnd1 - pulseStart1;
 
@@ -80,6 +84,8 @@ void measurePulse1() {
     Serial.print("v1 Speed: ");
     Serial.print(v1);
     Serial.println(" km/h");
+
+    attachInterrupt(digitalPinToInterrupt(Sigpin1), measurePulse1, CHANGE); // 인터럽트 활성화
   }
 }
 
@@ -87,6 +93,9 @@ void measurePulse2() {
   if (digitalRead(Sigpin2) == HIGH) { // while(digitalRead) 부분
     pulseStart2 = micros();
   } else {  // while(!digitalRead) 부분
+    detachInterrupt(digitalPinToInterrupt(Sigpin2)); // 인터럽트 비활성화
+    delay(100);
+
     pulseEnd2 = micros();
     pulseDuration2 = pulseEnd2 - pulseStart2;
 
@@ -94,6 +103,8 @@ void measurePulse2() {
     Serial.print("v2 Speed: ");
     Serial.print(v2);
     Serial.println(" km/h");
+
+    attachInterrupt(digitalPinToInterrupt(Sigpin2), measurePulse2, CHANGE); // 인터럽트 활성화
   }
 }
 

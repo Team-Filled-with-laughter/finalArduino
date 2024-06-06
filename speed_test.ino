@@ -15,14 +15,6 @@ const int In2 = 6;
 const int overSpeed = 5;
 const int Address = 0x50;
 
-volatile unsigned long pulseStart1 = 0;
-volatile unsigned long pulseEnd1 = 0;
-volatile unsigned long pulseDuration1 = 0;
-
-volatile unsigned long pulseStart2 = 0;
-volatile unsigned long pulseEnd2 = 0;
-volatile unsigned long pulseDuration2 = 0;
-
 bool isOverspeed = false;
 bool isEmergency = false;
 
@@ -44,8 +36,8 @@ void setup() {
   pinMode(In2, OUTPUT);
   MsTimer2::set(500,playLcd);
   MsTimer2::start();
-  attachInterrupt(digitalPinToInterrupt(Sigpin1), measurePulse1, CHANGE); // Sigpin1에 대한 인터럽트
-  attachInterrupt(digitalPinToInterrupt(Sigpin2), measurePulse2, CHANGE); // Sigpin2에 대한 인터럽트
+  attachInterrupt(digitalPinToInterrupt(Sigpin1), measurePulse1, RISING); // Sigpin1에 대한 인터럽트
+  attachInterrupt(digitalPinToInterrupt(Sigpin2), measurePulse2, RISING); // Sigpin2에 대한 인터럽트
   actuatorUp();
 }
 
@@ -69,58 +61,53 @@ u8g2.firstPage();
   } while (u8g2.nextPage());
 }
 
-void measurePulse1() {
-  if (digitalRead(Sigpin1) == HIGH) { // while(digitalRead) 부분
-    pulseStart1 = micros();
-  } 
-  else {  // while(!digitalRead) 부분
-    detachInterrupt(digitalPinToInterrupt(Sigpin1)); // 인터럽트 비활성화
-    delay(100);
+void speedCheck1() {
+  unsigned long T = pulseIn(Sigpin1, HIGH) + pulseIn(Sigpin1, LOW); // 0.1s안에 HIGH값 안들어오면 0처리
 
-    pulseEnd1 = micros();
-    pulseDuration1 = pulseEnd1 - pulseStart1;
+  if (T != 0)
+  {
+    double frequency = 1.0 / T;
+    v1 = ((frequency * 1e6) / 44.0);
 
-    v1 = calculateSpeed(pulseDuration1);
-    Serial.print("v1 Speed: ");
-    Serial.print(v1);
-    Serial.println(" km/h");
-
-    attachInterrupt(digitalPinToInterrupt(Sigpin1), measurePulse1, CHANGE); // 인터럽트 활성화
+    if (value <= 120) 
+    {
+      Serial.print("v1 Speed: ");
+      Serial.print(v1);
+      Serial.println(" km/h");
+    }
+    else // 속도 이상값 
+    {
+      Serial.print("Velocity Outlier!")
+    }
+  }
+  else 
+  { // 측정이 안된경우 
+    Serial.print("No sensing!");
   }
 }
 
-void measurePulse2() {
-  if (digitalRead(Sigpin2) == HIGH) { // while(digitalRead) 부분
-    pulseStart2 = micros();
-  } else {  // while(!digitalRead) 부분
-    detachInterrupt(digitalPinToInterrupt(Sigpin2)); // 인터럽트 비활성화
-    delay(100);
+void speedCheck2() {
+  unsigned long T = pulseIn(Sigpin2, HIGH) + pulseIn(Sigpin2, LOW); // 0.1s안에 HIGH값 안들어오면 0처리
 
-    pulseEnd2 = micros();
-    pulseDuration2 = pulseEnd2 - pulseStart2;
+  if (T != 0)
+  {
+    double frequency = 1.0 / T;
+    v2 = ((frequency * 1e6) / 44.0);
 
-    v2 = calculateSpeed(pulseDuration2);
-    Serial.print("v2 Speed: ");
-    Serial.print(v2);
-    Serial.println(" km/h");
-
-    attachInterrupt(digitalPinToInterrupt(Sigpin2), measurePulse2, CHANGE); // 인터럽트 활성화
+    if (value <= 120) 
+    {
+      Serial.print("v2 Speed: ");
+      Serial.print(v1);
+      Serial.println(" km/h");
+    }
+    else // 속도 이상값 
+    {
+      Serial.print("Velocity Outlier!")
+    }
   }
-}
-
-int calculateSpeed(unsigned long duration) {
-  if (duration == 0){ // 주기가 0인경우 에러
-    Serial.print("Sensor error!");
-    return 0;
-  }
-  double frequency = 1.0 / duration;
-  int value = ((frequency * 1e6) / 44.0);
-  
-  if(value <= 120)  // 속도가 120 넘어가는 경우 에러(120km/s까지 측정가능)
-    return value;
-  else{
-    Serial.print("Velocity Outlier!");
-    return 0;
+  else 
+  { // 측정이 안된경우 
+    Serial.print("No sensing!");
   }
 }
 
@@ -146,7 +133,6 @@ void detectEmergency() {
 }
 
 void loop() {
-  unsigned long currentMillis = millis();
 
   isOverspeed = (v1 >= overSpeed || v2 >= overSpeed) ? true : false; // 수정
 
@@ -154,20 +140,10 @@ void loop() {
     detectEmergency(); // 과속이 아니면 사실상 어떤 객체가 지나가도 작동안하므로 과속일때만 객체를 인식하는 기능
 
     if (!isEmergency){
-      overSpeedStartTime = currentMillis;
       Serial.println("Overspeed!!!");
       actuatorDown();
-      while (currentMillis <= overSpeedStartTime + 3000); // delay 3초 (아직 코드상 delay방법으로 채택)
+      delay(3000);
       actuatorUp();
-      overSpeedStartTime = 0; // 액추에이터가 올라오면 시간 초기화
     }
   }
 }
-
-/*  if (isOverspeed && !isEmergency) {  
-    overSpeedStartTime = currentMillis;
-    Serial.println("Overspeed!!!");
-    actuatorDown();
-    while (currentMillis <= overSpeedStartTime + 3000);
-    actuatorUp();
-    overSpeedStartTime = 0;  */

@@ -6,9 +6,8 @@
 #include <SPI.h>
 #endif
 
-// 아두이노에서 인터럽트핀을 사용하려면 2,3번핀만 사용가능 (핀 번호 교체이유)
-const int Sigpin1 = 2; // 원래 8번핀 
-const int Sigpin2 = 3; // 원래 12번핀
+const int Sigpin1 = 8; 
+const int Sigpin2 = 12; 
 const int speed = 9;
 const int In1 = 5;
 const int In2 = 6;
@@ -17,8 +16,6 @@ const int Address = 0x50;
 
 bool isOverspeed = false;
 bool isEmergency = false;
-
-unsigned long overSpeedStartTime = 0;
 
 int v1 = 0;
 int v2 = 0;
@@ -36,8 +33,6 @@ void setup() {
   pinMode(In2, OUTPUT);
   MsTimer2::set(500,playLcd);
   MsTimer2::start();
-  attachInterrupt(digitalPinToInterrupt(Sigpin1), measurePulse1, RISING); // Sigpin1에 대한 인터럽트
-  attachInterrupt(digitalPinToInterrupt(Sigpin2), measurePulse2, RISING); // Sigpin2에 대한 인터럽트
   actuatorUp();
 }
 
@@ -62,14 +57,16 @@ u8g2.firstPage();
 }
 
 void speedCheck1() {
-  unsigned long T = pulseIn(Sigpin1, HIGH) + pulseIn(Sigpin1, LOW); // 0.1s안에 HIGH값 안들어오면 0처리
+  while (digitalRead(Sigpin1));
+  while (!digitalRead(Sigpin1));
+  unsigned long T = pulseIn(Sigpin1, HIGH) + pulseIn(Sigpin1, LOW); 
 
   if (T != 0)
   {
-    double frequency = 1.0 / T;
-    v1 = ((frequency * 1e6) / 44.0);
+    double frequency = 1.0 / (double)T;
+    v1 = int((frequency * 1e6) / 44.0);
 
-    if (value <= 120) 
+    if (v1 <= 120) 
     {
       Serial.print("v1 Speed: ");
       Serial.print(v1);
@@ -77,7 +74,7 @@ void speedCheck1() {
     }
     else // 속도 이상값 
     {
-      Serial.print("Velocity Outlier!")
+      Serial.print("Velocity Outlier!");
     }
   }
   else 
@@ -87,22 +84,24 @@ void speedCheck1() {
 }
 
 void speedCheck2() {
+  while (digitalRead(Sigpin2));
+  while (!digitalRead(Sigpin2));
   unsigned long T = pulseIn(Sigpin2, HIGH) + pulseIn(Sigpin2, LOW); // 0.1s안에 HIGH값 안들어오면 0처리
 
   if (T != 0)
   {
-    double frequency = 1.0 / T;
-    v2 = ((frequency * 1e6) / 44.0);
+    double frequency = 1.0 / (double)T;
+    v2 = int((frequency * 1e6) / 44.0);
 
-    if (value <= 120) 
+    if (v2 <= 120) 
     {
       Serial.print("v2 Speed: ");
-      Serial.print(v1);
+      Serial.print(v2);
       Serial.println(" km/h");
     }
     else // 속도 이상값 
     {
-      Serial.print("Velocity Outlier!")
+      Serial.print("Velocity Outlier!");
     }
   }
   else 
@@ -133,6 +132,9 @@ void detectEmergency() {
 }
 
 void loop() {
+
+  speedCheck1();
+  speedCheck2();
 
   isOverspeed = (v1 >= overSpeed || v2 >= overSpeed) ? true : false; // 수정
 

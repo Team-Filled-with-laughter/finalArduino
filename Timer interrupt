@@ -11,7 +11,27 @@ u8g2.firstPage();
   } while (u8g2.nextPage());
 }
 
+void actuatorUp() {
+  digitalWrite(In1, LOW);
+  digitalWrite(In2, HIGH);
+  analogWrite(speed, 255);
+  MsTimer2::stop();
+}
+
 void setup() {
 MsTimer2::set(500,playLcd);
 MsTimer2::start();
+}
+
+void loop() {
+  if (isOverspeed){ 
+    detectEmergency(); // 과속이 아니면 사실상 어떤 객체가 지나가도 작동안하므로 과속일때만 객체를 인식하는 기능
+
+    if (!isEmergency){
+      Serial.println("Overspeed!!!");
+      actuatorDown();
+      MsTimer2::set(3000,actuatorUp);
+      MsTimer2::start();
+    }
+  }
 }

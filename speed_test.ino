@@ -129,7 +129,6 @@ void actuatorUp() {
   digitalWrite(In1, LOW);
   digitalWrite(In2, HIGH);
   analogWrite(speed, 255);
-  MsTimer2::stop();
 }
 
 void loop() {
@@ -138,13 +137,13 @@ void loop() {
   speedCheck2();
 
   isOverspeed = (v1 >= overSpeed || v2 >= overSpeed) ? true : false; // 수정
-
+  
   if (isOverspeed){ 
     if (!isEmergency){
       Serial.println("Overspeed!!!");
       actuatorDown();
-      MsTimer2::set(3000,actuatorUp);
-      MsTimer2::start();
+      delay(3000);
+      actuatorUp();
     }
   }
 }

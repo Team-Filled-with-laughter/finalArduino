@@ -5,6 +5,11 @@
 #endif
 
 U8G2_ST7920_128X64_1_SW_SPI u8g2(U8G2_R0, /* clock=*/ 13, /* data=*/ 11, /* CS=*/ 10, /* reset=*/ 8);
+/* VCC -> 빨간색 GND, 갈색 VCC
+ * RS/E -> 검정색 RS(CS) , 흰색 R/W(DATA), 회색 E(clock)
+ * RST -> 초록색 PSB , 갈색 RST(reset)
+ * BLK -> 주황색 BLA , 노란색 BLK
+ */
 
 const int rainSensor = A4;
 

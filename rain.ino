@@ -6,6 +6,16 @@
 
 U8G2_ST7920_128X64_1_SW_SPI u8g2(U8G2_R0, /* clock=*/ 13, /* data=*/ 11, /* CS=*/ 10, /* reset=*/ 8);
 
+const int rainSensor = A4;
+
+void setup(void) {
+  
+  u8g2.begin();
+  u8g2.enableUTF8Print();    // enable UTF8 support for the Arduino print() function
+  Serial.begin(9600);
+  pinMode(rainSensor,INPUT);      // rain sensor
+}
+
 void draw1(void)
 {
   u8g2.setFont(u8g2_font_unifont_t_korean1);
@@ -25,26 +35,22 @@ void draw2(void)
   u8g2.print("안전 운행하세요");
 }
 
-void setup(void) {
-  
-  u8g2.begin();
-  u8g2.enableUTF8Print();    // enable UTF8 support for the Arduino print() function
-  Serial.begin(9600);
-  pinMode(A4,INPUT);      // rain sensor
-}
+void loop() {
+  // 비 감지 센서 값 읽기
+  int rainValue = analogRead(rainSensor);
 
-void loop(){
-  if(analogRead(A4)<700){
-    u8g2.firstPage();
-      do {
-          draw2();
-      } while ( u8g2.nextPage() );
+  // 비가 내리면 (센서 값이 700 미만일 때)
+  if (rainValue < 700) {
+    u8g2.firstPage();        // 새로운 페이지 시작
+    do {
+      draw2();               // "비가 내리니 안전 운행하세요" 메시지 출력
+    } while (u8g2.nextPage()); // 화면 업데이트
+  } else {
+    u8g2.firstPage();        // 새로운 페이지 시작
+    do {
+      draw1();               // "즐거운 하루 되세요!" 메시지 출력
+    } while (u8g2.nextPage()); // 화면 업데이트
   }
-  else{
-      u8g2.firstPage();
-      do {
-          draw1();
-      } while ( u8g2.nextPage() );
-  }
-  delay(1000);
+
+  delay(1000);  // 1초 대기 후 다시 반복
 }
